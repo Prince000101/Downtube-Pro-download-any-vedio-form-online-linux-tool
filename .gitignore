@@ -1,0 +1,22 @@
+# Virtual environment
+.venv/
+.idea/
+venv/
+env/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+
+# PyInstaller build
+dist/
+build/
+*.spec
+
+# VS Code or PyCharm settings
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
