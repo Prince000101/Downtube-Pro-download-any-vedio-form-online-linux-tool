@@ -2,6 +2,7 @@ import re
 import os
 import sys
 import json
+import shutil
 from PyQt5.QtCore import QObject, QProcess, pyqtSignal
 
 
@@ -123,6 +124,21 @@ class DownloadEngine(QObject):
                         pass
         return results
 
+    @staticmethod
+    def _find_node():
+        candidates = [
+            shutil.which("node"),
+            os.path.expanduser("~/.nvm/versions/node/*/bin/node"),
+        ]
+        for c in candidates:
+            if c and os.path.exists(c):
+                return os.path.realpath(c)
+        for d in os.listdir(os.path.expanduser("~/.nvm/versions/node/")):
+            p = os.path.join(os.path.expanduser("~/.nvm/versions/node/"), d, "bin", "node")
+            if os.path.exists(p):
+                return os.path.realpath(p)
+        return None
+
     def start_download(self, url, output_template, extra_args=None):
         if self._running:
             self.log_line.emit("Already downloading. Queue this instead.")
@@ -133,6 +149,12 @@ class DownloadEngine(QObject):
         self._cancelled = False
 
         cmd = [self.ytdlp_path, url, "-o", output_template, "--newline"]
+
+        node_path = self._find_node()
+        if node_path:
+            cmd.extend(["--js-runtimes", f"node:{node_path}"])
+        cmd.extend(["--remote-components", "ejs:github"])
+
         if extra_args:
             cmd.extend(extra_args)
 
