@@ -126,17 +126,15 @@ class DownloadEngine(QObject):
 
     @staticmethod
     def _find_node():
-        candidates = [
-            shutil.which("node"),
-            os.path.expanduser("~/.nvm/versions/node/*/bin/node"),
-        ]
-        for c in candidates:
-            if c and os.path.exists(c):
-                return os.path.realpath(c)
-        for d in os.listdir(os.path.expanduser("~/.nvm/versions/node/")):
-            p = os.path.join(os.path.expanduser("~/.nvm/versions/node/"), d, "bin", "node")
-            if os.path.exists(p):
-                return os.path.realpath(p)
+        path = shutil.which("node")
+        if path:
+            return os.path.realpath(path)
+        nvm_dir = os.path.expanduser("~/.nvm/versions/node")
+        if os.path.isdir(nvm_dir):
+            for d in sorted(os.listdir(nvm_dir), reverse=True):
+                p = os.path.join(nvm_dir, d, "bin", "node")
+                if os.path.exists(p):
+                    return os.path.realpath(p)
         return None
 
     def start_download(self, url, output_template, extra_args=None):
@@ -161,6 +159,8 @@ class DownloadEngine(QObject):
         cookies = resource_path("cookies.txt")
         if os.path.exists(cookies):
             cmd.extend(["--cookies", cookies])
+        else:
+            self.log_line.emit("No cookies.txt found — login-protected content may fail.")
 
         self.log_line.emit(f"Starting: {url}")
         self.process.start(cmd[0], cmd[1:])
@@ -198,7 +198,11 @@ class DownloadEngine(QObject):
         data = self.process.readAllStandardError().data().decode()
         for line in data.split("\n"):
             line = line.strip()
-            if line:
+            if not line:
+                continue
+            if "sign in" in line.lower() or "cookie" in line.lower():
+                self.log_line.emit(f"[COOKIE] {line}")
+            else:
                 self.log_line.emit(line)
 
     def _on_finished(self, exit_code, exit_status):

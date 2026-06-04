@@ -108,6 +108,32 @@ cp dist/DownTube ~/Desktop/
 
 ---
 
+## 🍪 Cookies for restricted content
+
+Some YouTube videos (age-restricted, private, or unlisted) require you to be signed in.
+
+### Export cookies from your browser
+
+1. Install the [Get cookies.txt](https://chrome.google.com/webstore/detail/get-cookies-txt/) Chrome extension, or use the [Firefox version](https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/)
+2. Log into YouTube in your browser
+3. Click the extension icon → **Export** → save as `cookies.txt`
+4. Place `cookies.txt` next to the executable (or in the project root)
+
+### Auto-export from Firefox (Linux)
+
+```bash
+yt-dlp --cookies-from-browser firefox --cookies cookies.txt
+```
+
+### Troubleshooting
+
+- **"Sign in to confirm you're not a bot"** → Your cookies are expired or missing. Export fresh ones.
+- **Cookies expire** every few months — re-export when downloads stop working.
+- The app logs `[COOKIE]` warnings when it detects cookie-related errors.
+- No cookies are needed for public videos.
+
+---
+
 ## Features
 
 - **Download videos** as MP4 with best video + audio merging
@@ -190,12 +216,13 @@ DownTube/
 
 DownTube includes a full Material Design 3 theming engine:
 
-| Theme    | Seed Color | Vibe    |
-|----------|------------|---------|
-| Ocean    | `#1565C0`  | Blue    |
-| Forest   | `#2E7D32`  | Green   |
-| Lavender | `#7B1FA2`  | Purple  |
-| Ember    | `#D84315`  | Red/Orange |
+| Theme    | Seed Color | Vibe        |
+|----------|------------|-------------|
+| Ocean    | `#1565C0`  | Blue        |
+| Forest   | `#2E7D32`  | Green       |
+| Lavender | `#7B1FA2`  | Purple      |
+| Ember    | `#D84315`  | Red/Orange  |
+| Grey     | `#616161`  | Monochrome  |
 
 Each scheme has **Light** and **Dark** modes with ~30 color tokens applied via QPalette and a comprehensive QSS stylesheet.
 
