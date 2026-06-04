@@ -34,11 +34,27 @@ class DownloadEngine(QObject):
         )
         self._ytdlp_path = None
 
+    @staticmethod
+    def _find_ytdlp():
+        name = "yt-dlp.exe" if sys.platform == "win32" else "yt-dlp"
+        exe_dir = os.path.dirname(os.path.realpath(sys.executable))
+        candidates = [
+            os.path.join(exe_dir, name),
+            resource_path(name),
+        ]
+        for p in candidates:
+            if os.path.exists(p):
+                return os.path.realpath(p)
+        which = shutil.which(name)
+        if which:
+            return os.path.realpath(which)
+        return resource_path(name)
+
     @property
     def ytdlp_path(self):
         if self._ytdlp_path:
             return self._ytdlp_path
-        return resource_path("yt-dlp.exe" if sys.platform == "win32" else "yt-dlp")
+        return self._find_ytdlp()
 
     @ytdlp_path.setter
     def ytdlp_path(self, path):
