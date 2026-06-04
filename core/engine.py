@@ -1,0 +1,186 @@
+import re
+import os
+import sys
+import json
+from PyQt5.QtCore import QObject, QProcess, pyqtSignal
+
+
+def resource_path(relative_path):
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+
+class DownloadEngine(QObject):
+    progress_changed = pyqtSignal(int)
+    speed_changed = pyqtSignal(str)
+    eta_changed = pyqtSignal(str)
+    status_changed = pyqtSignal(str)
+    log_line = pyqtSignal(str)
+    finished = pyqtSignal(bool, str)
+    video_info_ready = pyqtSignal(dict)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.process = QProcess(self)
+        self.process.readyReadStandardOutput.connect(self._on_stdout)
+        self.process.readyReadStandardError.connect(self._on_stderr)
+        self.process.finished.connect(self._on_finished)
+        self._current_url = None
+        self._running = False
+        self._cancelled = False
+        self._progress_pattern = re.compile(
+            r"\[download\]\s+(\d+\.\d)%\s+(?:of\s+~?([\d.]+[KMG]?i?B))?\s*(?:at\s+([\d.]+[KMG]?i?B/s))?\s*(?:ETA\s+(\S+))?"
+        )
+        self._ytdlp_path = None
+
+    @property
+    def ytdlp_path(self):
+        if self._ytdlp_path:
+            return self._ytdlp_path
+        return resource_path("yt-dlp.exe" if sys.platform == "win32" else "yt-dlp")
+
+    @ytdlp_path.setter
+    def ytdlp_path(self, path):
+        self._ytdlp_path = path
+
+    def fetch_info(self, url):
+        p = QProcess(self)
+        args = [
+            self.ytdlp_path, "--dump-json", "--no-download", "--quiet",
+            "--no-warnings", url
+        ]
+        p.start(args[0], args[1:])
+        p.waitForFinished(30000)
+        out = p.readAllStandardOutput().data().decode().strip()
+        err = p.readAllStandardError().data().decode().strip()
+        if out:
+            try:
+                info = json.loads(out.split("\n")[0])
+                self.video_info_ready.emit(info)
+                return info
+            except json.JSONDecodeError:
+                self.log_line.emit(f"Failed to parse video info: {err}")
+        else:
+            self.log_line.emit(f"Failed to fetch video info: {err}")
+        return None
+
+    def fetch_formats(self, url):
+        p = QProcess(self)
+        args = [
+            self.ytdlp_path, "--dump-json", "--no-download", "--quiet",
+            "--no-warnings", url
+        ]
+        p.start(args[0], args[1:])
+        p.waitForFinished(30000)
+        out = p.readAllStandardOutput().data().decode().strip()
+        if out:
+            try:
+                info = json.loads(out.split("\n")[0])
+                return info.get("formats", [])
+            except json.JSONDecodeError:
+                pass
+        return []
+
+    def fetch_playlist(self, url):
+        p = QProcess(self)
+        args = [
+            self.ytdlp_path, "--dump-json", "--flat-playlist", "--quiet",
+            "--no-warnings", url
+        ]
+        p.start(args[0], args[1:])
+        p.waitForFinished(30000)
+        out = p.readAllStandardOutput().data().decode().strip()
+        entries = []
+        if out:
+            for line in out.split("\n"):
+                line = line.strip()
+                if line:
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
+        return entries
+
+    def search(self, query, limit=10):
+        search_url = f"ytsearch{limit}:{query}"
+        p = QProcess(self)
+        args = [
+            self.ytdlp_path, "--dump-json", "--flat-playlist", "--quiet",
+            "--no-warnings", search_url
+        ]
+        p.start(args[0], args[1:])
+        p.waitForFinished(30000)
+        out = p.readAllStandardOutput().data().decode().strip()
+        results = []
+        if out:
+            for line in out.split("\n"):
+                line = line.strip()
+                if line:
+                    try:
+                        results.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
+        return results
+
+    def start_download(self, url, output_template, extra_args=None):
+        if self._running:
+            self.log_line.emit("Already downloading. Queue this instead.")
+            return
+
+        self._current_url = url
+        self._running = True
+        self._cancelled = False
+
+        cmd = [self.ytdlp_path, url, "-o", output_template, "--newline"]
+        if extra_args:
+            cmd.extend(extra_args)
+
+        cookies = resource_path("cookies.txt")
+        if os.path.exists(cookies):
+            cmd.extend(["--cookies", cookies])
+
+        self.log_line.emit(f"Starting: {url}")
+        self.process.start(cmd[0], cmd[1:])
+
+    def cancel(self):
+        if self._running and self.process.state() == QProcess.Running:
+            self._cancelled = True
+            self.process.kill()
+            self.log_line.emit("Cancelled.")
+
+    def is_running(self):
+        return self._running
+
+    def _on_stdout(self):
+        data = self.process.readAllStandardOutput().data().decode()
+        for line in data.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            self.log_line.emit(line)
+
+            m = self._progress_pattern.search(line)
+            if m:
+                pct = float(m.group(1))
+                self.progress_changed.emit(int(pct))
+                if m.group(3):
+                    self.speed_changed.emit(m.group(3))
+                if m.group(4):
+                    self.eta_changed.emit(m.group(4))
+
+            if "has already been downloaded" in line:
+                self.progress_changed.emit(100)
+
+    def _on_stderr(self):
+        data = self.process.readAllStandardError().data().decode()
+        for line in data.split("\n"):
+            line = line.strip()
+            if line:
+                self.log_line.emit(line)
+
+    def _on_finished(self, exit_code, exit_status):
+        self._running = False
+        success = exit_code == 0 and not self._cancelled
+        msg = "finished" if success else ("cancelled" if self._cancelled else f"failed (exit {exit_code})")
+        self.finished.emit(success, msg)

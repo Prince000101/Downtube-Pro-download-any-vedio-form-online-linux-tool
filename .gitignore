@@ -8,15 +8,35 @@ env/
 __pycache__/
 *.py[cod]
 
-# PyInstaller build
-dist/
+# PyInstaller build artifacts
 build/
+dist/
 *.spec
 
 # VS Code or PyCharm settings
 .vscode/
 .idea/
 
+# Database
+*.db
+*.sqlite
+
 # OS files
 .DS_Store
 Thumbs.db
+
+# Sensitive data
+cookies.txt
+
+# Screenshots (not needed in repo)
+screenshot/
+
+# yt-dlp binary (user provides their own)
+yt-dlp
+yt-dlp.exe
+
+# Legacy entry point
+ytdl_gui.py
+
+# Misc artifacts
+sys

@@ -11,9 +11,100 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
-  <img src="https://img.shields.io/badge/platform-linux-success" alt="Linux">
+  <img src="https://img.shields.io/badge/platform-linux-windows-success" alt="Linux">
   <img src="https://img.shields.io/badge/license-MIT-yellow" alt="License">
 </p>
+
+---
+
+## 📥 Download
+
+### Pre-built executable (no Python required)
+
+| Platform | File | How to get it |
+|----------|------|---------------|
+| 🐧 Linux | `DownTube` | Run `./build.sh` → `dist/DownTube` |
+| 🪟 Windows | `DownTube.exe` | Run `setup_windows.bat` → desktop shortcut created automatically |
+| 🍎 macOS | `DownTube` | Run `./build.sh` → `dist/DownTube` |
+
+### Run from source
+
+```bash
+git clone https://github.com/Prince000101/Downtube-Pro-download-any-vedio-form-online-linux-tool.git
+cd DownTube
+pip install PyQt5
+python main.py
+```
+
+📌 **yt-dlp binary** must be placed next to the executable (or in your PATH) for downloads to work.
+
+---
+
+## 🚀 Setup
+
+### 🐧 Linux
+
+```bash
+# 1. Clone
+git clone https://github.com/Prince000101/Downtube-Pro-download-any-vedio-form-online-linux-tool.git
+cd DownTube
+
+# 2. Build standalone executable
+./build.sh
+
+# 3. Copy to desktop
+cp dist/DownTube ~/Desktop/
+
+# 4. Download yt-dlp and place next to executable
+#    https://github.com/yt-dlp/yt-dlp/releases
+
+# 5. Create desktop launcher
+cat > ~/Desktop/downtube.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=DownTube
+Comment=YouTube video & audio downloader
+Exec=/home/$USER/Desktop/DownTube
+Icon=/home/$USER/Desktop/icon.png
+Terminal=false
+Categories=AudioVideo;Utility;
+EOF
+
+chmod +x ~/Desktop/downtube.desktop
+gio set ~/Desktop/downtube.desktop metadata::trusted true
+```
+
+### 🪟 Windows
+
+```cmd
+:: 1. Clone the repo (or download ZIP from GitHub)
+git clone https://github.com/Prince000101/Downtube-Pro-download-any-vedio-form-online-linux-tool.git
+cd DownTube
+
+:: 2. Double-click setup_windows.bat — it does everything:
+::    - Checks Python & Git are installed
+::    - Installs dependencies (PyQt5, pyinstaller)
+::    - Builds DownTube.exe
+::    - Copies it to your desktop
+
+:: 3. Download yt-dlp.exe and place next to the executable:
+::    https://github.com/yt-dlp/yt-dlp/releases
+```
+
+### 🍎 macOS
+
+```bash
+# Clone & build
+git clone https://github.com/Prince000101/Downtube-Pro-download-any-vedio-form-online-linux-tool.git
+cd DownTube
+./build.sh
+
+# Copy to desktop
+cp dist/DownTube ~/Desktop/
+
+# Download yt-dlp and place next to executable
+# https://github.com/yt-dlp/yt-dlp/releases
+```
 
 ---
 
@@ -33,48 +124,6 @@
 - **Programmatic icons** — 16 SVG-like icons rendered with QPainter
 - **Single-file executable** — build with PyInstaller
 - **Cross-platform** — Linux primary, Windows supported
-
----
-
-## Screenshots
-
-<p align="center">
-  <img src="screenshot/screenshot1.png" alt="Screenshot 1" width="45%">
-  <img src="screenshot/screenshot2.png" alt="Screenshot 2" width="45%">
-</p>
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.10+
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) binary in the project root (or in PATH)
-
-### Run from source
-
-```bash
-# Clone
-git clone https://github.com/Prince000101/Downtube-Pro-download-any-vedio-form-online-linux-tool.git
-cd DownTube
-
-# Virtual environment (recommended)
-python -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run
-python main.py
-```
-
-### Cookies (for restricted content)
-
-1. Install [Get cookies.txt](https://chrome.google.com/webstore/detail/get-cookies-txt/) browser extension
-2. Log into YouTube, export cookies to `cookies.txt`
-3. Place `cookies.txt` in the project root
 
 ---
 
@@ -105,43 +154,15 @@ python main.py
 
 ---
 
-## Build standalone executable
-
-### Linux (AppImage)
-
-```bash
-pip install pyinstaller
-pyinstaller --onefile --noconsole --icon=icon.png \
-  --add-data "yt-dlp:." \
-  --add-data "cookies.txt:." \
-  --add-data "icon.png:." \
-  main.py
-```
-
-### Windows (exe)
-
-```cmd
-pip install pyinstaller
-pyinstaller --onefile --noconsole --icon=icon.png ^
-  --add-data "yt-dlp;." ^
-  --add-data "cookies.txt;." ^
-  --add-data "icon.png;." ^
-  main.py
-```
-
-The executable appears in `dist/`.
-
----
-
 ## Project structure
 
 ```
 DownTube/
 ├── main.py                 # Application entry point
 ├── requirements.txt        # PyQt5>=5.15.0
-├── cookies.txt             # Browser cookies placeholder
 ├── icon.png                # Application icon
-├── yt-dlp                  # Bundled yt-dlp binary
+├── build.sh                # Linux/macOS build script
+├── setup_windows.bat       # Windows setup script
 │
 ├── core/                   # Backend logic
 │   ├── engine.py           # yt-dlp QProcess wrapper
@@ -157,12 +178,10 @@ DownTube/
 │   ├── search_dialog.py    # YouTube search
 │   └── widgets.py          # VideoCard, PreviewWidget, utilities
 │
-├── theme/                  # Material Design 3 theming
-│   ├── manager.py          # Theme engine + QSS generation
-│   ├── colors.py           # 4 color schemes x Dark/Light
-│   └── icons.py            # 16 programmatic icons (QPainter)
-│
-└── screenshot/             # Screenshots
+└── theme/                  # Material Design 3 theming
+    ├── manager.py          # Theme engine + QSS generation
+    ├── colors.py           # 4 color schemes x Dark/Light
+    └── icons.py            # 16 programmatic icons (QPainter)
 ```
 
 ---
