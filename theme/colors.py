@@ -251,8 +251,6 @@ THEMES = {
             "surface_container_high": "#352C27",
         },
     },
-}
-
     "grey": {
         "name": "Grey",
         "seed": "#616161",
