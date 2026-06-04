@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QListWidget, QListWidgetItem, QWidget
+    QLineEdit, QListWidget, QListWidgetItem
 )
 from PyQt5.QtCore import Qt, QTimer
 

@@ -1,14 +1,11 @@
 import os
-import json
 import time
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QCheckBox, QTextEdit, QProgressBar, QListWidget,
-    QListWidgetItem, QFileDialog, QFrame, QSplitter, QScrollArea,
-    QSizePolicy
+    QLineEdit, QCheckBox, QTextEdit, QListWidget,
+    QListWidgetItem, QFileDialog, QSplitter
 )
 from PyQt5.QtCore import Qt, QTimer, QSize
-from PyQt5.QtGui import QPixmap, QFont, QIcon
 
 from core.queue import (
     DownloadItem, STATUS_QUEUED, STATUS_DOWNLOADING,
@@ -280,7 +277,7 @@ class DownloadPage(QWidget):
         output_template = os.path.join(output_folder, template)
 
         if download_video and not download_audio:
-            extra_args += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
+            extra_args += ["-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]", "--merge-output-format", "mp4"]
         elif download_audio and not download_video:
             extra_args += [
                 "-x", "--audio-format", "mp3", "--audio-quality", "0",
@@ -288,7 +285,7 @@ class DownloadPage(QWidget):
                 "--convert-thumbnails", "jpg"
             ]
         else:
-            extra_args += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
+            extra_args += ["-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]", "--merge-output-format", "mp4"]
 
         info = self._current_info
         item = DownloadItem(

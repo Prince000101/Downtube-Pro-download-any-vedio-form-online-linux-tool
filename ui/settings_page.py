@@ -3,7 +3,6 @@ from PyQt5.QtWidgets import (
     QComboBox, QLineEdit, QFileDialog, QGroupBox, QFrame
 )
 from PyQt5.QtCore import Qt, QSize, QSettings, QTimer
-from PyQt5.QtGui import QColor
 
 from theme import THEMES, THEME_NAMES, DEFAULT_THEME
 

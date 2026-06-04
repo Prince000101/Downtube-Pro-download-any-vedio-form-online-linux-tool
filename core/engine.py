@@ -16,7 +16,6 @@ class DownloadEngine(QObject):
     progress_changed = pyqtSignal(int)
     speed_changed = pyqtSignal(str)
     eta_changed = pyqtSignal(str)
-    status_changed = pyqtSignal(str)
     log_line = pyqtSignal(str)
     finished = pyqtSignal(bool, str)
     video_info_ready = pyqtSignal(dict)
@@ -28,7 +27,6 @@ class DownloadEngine(QObject):
         self.process.readyReadStandardError.connect(self._on_stderr)
         self.process.finished.connect(self._on_finished)
         self.process.errorOccurred.connect(self._on_process_error)
-        self._current_url = None
         self._running = False
         self._cancelled = False
         self._progress_pattern = re.compile(
@@ -143,7 +141,6 @@ class DownloadEngine(QObject):
             self.log_line.emit("Already downloading. Queue this instead.")
             return
 
-        self._current_url = url
         self._running = True
         self._cancelled = False
 

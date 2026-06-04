@@ -1,7 +1,6 @@
 import sys
 import traceback
 from PyQt5.QtWidgets import QApplication, QMessageBox
-from PyQt5.QtCore import Qt
 
 
 def _log_crash(exc_type, exc_value, exc_tb):

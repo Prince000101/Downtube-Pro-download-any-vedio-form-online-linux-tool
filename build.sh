@@ -9,6 +9,7 @@ pyinstaller --onefile --windowed \
     --add-data "ui:ui" \
     --add-data "theme:theme" \
     --add-data "icon.png:." \
+    --add-data "cookies.txt:." \
     --hidden-import "core.engine" \
     --hidden-import "core.queue" \
     --hidden-import "core.history" \

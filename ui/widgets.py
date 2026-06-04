@@ -1,8 +1,6 @@
-import os
-import json
 from PyQt5.QtWidgets import (
-    QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QProgressBar, QFrame, QSizePolicy
+    QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
+    QProgressBar, QFrame
 )
 from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import QPixmap, QFont, QIcon
@@ -125,28 +123,6 @@ class VideoCard(QFrame):
             STATUS_CANCELLED: "⛔",
         }
         self.status_icon.setText(icons.get(self.item.status, ""))
-
-    def update_progress(self, progress):
-        self.item.progress = progress
-        self.progress_bar.setValue(progress)
-        self.progress_bar.setVisible(True)
-        self.meta_label.setText(f"{progress}%")
-
-    def update_speed(self, speed):
-        self.item.speed = speed
-        if speed:
-            self.speed_label.setText(speed)
-
-    def update_eta(self, eta):
-        self.item.eta = eta
-        meta = self.meta_label.text()
-        if meta.endswith("%") and eta:
-            self.meta_label.setText(f"{meta} • ETA {eta}")
-
-    def update_status(self, status):
-        self.item.status = status
-        self._update_status_icon()
-
 
 class PreviewWidget(QFrame):
     def __init__(self, parent=None):

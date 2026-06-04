@@ -1,4 +1,3 @@
-import colorsys
 from PyQt5.QtGui import QColor
 
 
@@ -316,7 +315,7 @@ THEMES = {
 }
 
 THEME_NAMES = list(THEMES.keys())
-DEFAULT_THEME = "ocean"
+DEFAULT_THEME = "grey"
 
 
 class PaletteSet:
