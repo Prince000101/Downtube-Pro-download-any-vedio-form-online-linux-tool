@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import sys
 import time
 from PyQt5.QtCore import QObject
 
@@ -7,10 +8,20 @@ from PyQt5.QtCore import QObject
 DB_NAME = "downtube_history.db"
 
 
+def _default_db_path():
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA", os.path.expanduser("~"))
+    else:
+        base = os.environ.get("XDG_DATA_HOME", os.path.join(os.path.expanduser("~"), ".local", "share"))
+    app_dir = os.path.join(base, "DownTube")
+    os.makedirs(app_dir, exist_ok=True)
+    return os.path.join(app_dir, DB_NAME)
+
+
 class HistoryManager(QObject):
     def __init__(self, db_path=None, parent=None):
         super().__init__(parent)
-        self.db_path = db_path or os.path.join(os.path.abspath("."), DB_NAME)
+        self.db_path = db_path or _default_db_path()
         self._conn = None
         self._init_db()
 
