@@ -27,6 +27,7 @@ class DownloadEngine(QObject):
         self.process.readyReadStandardOutput.connect(self._on_stdout)
         self.process.readyReadStandardError.connect(self._on_stderr)
         self.process.finished.connect(self._on_finished)
+        self.process.errorOccurred.connect(self._on_process_error)
         self._current_url = None
         self._running = False
         self._cancelled = False
@@ -163,7 +164,18 @@ class DownloadEngine(QObject):
             self.log_line.emit("No cookies.txt found — login-protected content may fail.")
 
         self.log_line.emit(f"Starting: {url}")
+        self.log_line.emit(f"Command: {' '.join(cmd)}")
         self.process.start(cmd[0], cmd[1:])
+        if not self.process.waitForStarted(5000):
+            self._running = False
+            self.log_line.emit(f"Failed to start yt-dlp. Binary not found: {cmd[0]}")
+            self.finished.emit(False, f"yt-dlp not found at {cmd[0]}")
+
+    def _on_process_error(self, error):
+        self._running = False
+        msg = self.process.errorString()
+        self.log_line.emit(f"[ERROR] Process error: {msg}")
+        self.finished.emit(False, f"process error: {msg}")
 
     def cancel(self):
         if self._running and self.process.state() == QProcess.Running:
@@ -175,35 +187,41 @@ class DownloadEngine(QObject):
         return self._running
 
     def _on_stdout(self):
-        data = self.process.readAllStandardOutput().data().decode()
-        for line in data.split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            self.log_line.emit(line)
+        try:
+            data = self.process.readAllStandardOutput().data().decode()
+            for line in data.split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                self.log_line.emit(line)
 
-            m = self._progress_pattern.search(line)
-            if m:
-                pct = float(m.group(1))
-                self.progress_changed.emit(int(pct))
-                if m.group(3):
-                    self.speed_changed.emit(m.group(3))
-                if m.group(4):
-                    self.eta_changed.emit(m.group(4))
+                m = self._progress_pattern.search(line)
+                if m:
+                    pct = float(m.group(1))
+                    self.progress_changed.emit(int(pct))
+                    if m.group(3):
+                        self.speed_changed.emit(m.group(3))
+                    if m.group(4):
+                        self.eta_changed.emit(m.group(4))
 
-            if "has already been downloaded" in line:
-                self.progress_changed.emit(100)
+                if "has already been downloaded" in line:
+                    self.progress_changed.emit(100)
+        except Exception as e:
+            self.log_line.emit(f"[ERROR] stdout handler: {e}")
 
     def _on_stderr(self):
-        data = self.process.readAllStandardError().data().decode()
-        for line in data.split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            if "sign in" in line.lower() or "cookie" in line.lower():
-                self.log_line.emit(f"[COOKIE] {line}")
-            else:
-                self.log_line.emit(line)
+        try:
+            data = self.process.readAllStandardError().data().decode()
+            for line in data.split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                if "sign in" in line.lower() or "cookie" in line.lower():
+                    self.log_line.emit(f"[COOKIE] {line}")
+                else:
+                    self.log_line.emit(line)
+        except Exception as e:
+            self.log_line.emit(f"[ERROR] stderr handler: {e}")
 
     def _on_finished(self, exit_code, exit_status):
         self._running = False
