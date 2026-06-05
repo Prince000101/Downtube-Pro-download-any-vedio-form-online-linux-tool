@@ -2,7 +2,7 @@ import os
 import time
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QCheckBox, QTextEdit, QFileDialog
+    QLineEdit, QPlainTextEdit, QCheckBox, QTextEdit, QFileDialog
 )
 from PyQt5.QtCore import Qt, QTimer, QSize
 
@@ -51,9 +51,11 @@ class DownloadPage(QWidget):
         layout.addWidget(subtitle)
 
         input_layout = QHBoxLayout()
-        self.url_input = QLineEdit()
-        self.url_input.setPlaceholderText("Paste YouTube URL, playlist URL...")
-        self.url_input.textChanged.connect(self._on_url_changed)
+        self.url_input = QPlainTextEdit()
+        self.url_input.setPlaceholderText("Paste YouTube URLs (one per line)...")
+        self.url_input.setMinimumHeight(60)
+        self.url_input.setMaximumHeight(100)
+        self.url_input.textChanged.connect(self._on_text_changed)
         input_layout.addWidget(self.url_input, 1)
 
         self.search_btn = QPushButton()
@@ -163,11 +165,22 @@ class DownloadPage(QWidget):
         self.engine.finished.connect(self._on_download_finished)
         self.queue.all_completed.connect(self._on_all_completed)
 
-    def _on_url_changed(self, url):
-        url = url.strip()
-        if url and url != self._last_url and url.startswith("http"):
+    def _on_text_changed(self):
+        url = self._first_url()
+        if url and url != self._last_url:
             self._last_url = url
             self._fetch_timer.start(800)
+
+    def _first_url(self):
+        for line in self.url_input.toPlainText().split("\n"):
+            line = line.strip()
+            if line.startswith("http"):
+                return line
+        return ""
+
+    def _all_urls(self):
+        return [line.strip() for line in self.url_input.toPlainText().split("\n")
+                if line.strip().startswith("http")]
 
     def _do_fetch_info(self):
         url = self._last_url
@@ -191,7 +204,7 @@ class DownloadPage(QWidget):
     def _open_search(self):
         dialog = SearchDialog(self.engine.search, self)
         if dialog.exec() == SearchDialog.Accepted and dialog.selected_url:
-            self.url_input.setText(dialog.selected_url)
+            self.url_input.setPlainText(dialog.selected_url)
             self._last_url = ""
 
     def _load_url_file(self):
@@ -224,9 +237,9 @@ class DownloadPage(QWidget):
             )
 
     def _start_download(self):
-        url = self.url_input.text().strip()
-        if not url:
-            self.log_output.append("Please enter a URL.")
+        urls = self._all_urls()
+        if not urls:
+            self.log_output.append("Please enter at least one URL.")
             return
 
         output_folder = self.folder_input.text().strip()
@@ -258,21 +271,21 @@ class DownloadPage(QWidget):
         else:
             extra_args += ["-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]", "--merge-output-format", "mp4"]
 
-        info = self._current_info
         fmt = self._selected_format
-        item = DownloadItem(
-            url=url,
-            title=info.get("title", url) if info else url,
-            thumbnail=info.get("thumbnail", "") if info else "",
-            duration=info.get("duration") if info else None,
-            uploader=info.get("uploader", info.get("channel", "")) if info else "",
-            format_id=fmt.get("format_id", "") if fmt else "",
-            format_note=fmt.get("format_note", "") if fmt else "",
-            output_template=output_template,
-            extra_args=extra_args,
-        )
-        self.queue.add(item)
+        count = 0
+        for url in urls:
+            item = DownloadItem(
+                url=url,
+                title=url,
+                format_id=fmt.get("format_id", "") if fmt else "",
+                format_note=fmt.get("format_note", "") if fmt else "",
+                output_template=output_template,
+                extra_args=list(extra_args),
+            )
+            self.queue.add(item)
+            count += 1
 
+        self.log_output.append(f"Queued {count} URL(s).")
         if not self.engine.is_running():
             self._process_queue()
 
@@ -341,7 +354,7 @@ class DownloadPage(QWidget):
     def _clear(self):
         self.engine.cancel()
         self.queue.clear()
-        self.url_input.clear()
+        self.url_input.setPlainText("")
         self.log_output.clear()
         self.preview.setVisible(False)
         self._current_info = None
