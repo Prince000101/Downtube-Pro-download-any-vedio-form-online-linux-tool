@@ -16,6 +16,7 @@ class DownloadEngine(QObject):
     progress_changed = pyqtSignal(int)
     speed_changed = pyqtSignal(str)
     eta_changed = pyqtSignal(str)
+    size_changed = pyqtSignal(str)
     log_line = pyqtSignal(str)
     finished = pyqtSignal(bool, str)
     video_info_ready = pyqtSignal(dict)
@@ -212,6 +213,8 @@ class DownloadEngine(QObject):
                 if m:
                     pct = float(m.group(1))
                     self.progress_changed.emit(int(pct))
+                    if m.group(2):
+                        self.size_changed.emit(m.group(2))
                     if m.group(3):
                         self.speed_changed.emit(m.group(3))
                     if m.group(4):

@@ -15,6 +15,7 @@ pyinstaller --onefile --windowed \
     --hidden-import "core.history" \
     --hidden-import "ui.main_window" \
     --hidden-import "ui.download_page" \
+    --hidden-import "ui.queue_page" \
     --hidden-import "ui.history_page" \
     --hidden-import "ui.settings_page" \
     --hidden-import "ui.widgets" \

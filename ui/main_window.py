@@ -13,12 +13,14 @@ from core.queue import DownloadQueue
 from core.history import HistoryManager
 from core import resource_path
 from ui.download_page import DownloadPage
+from ui.queue_page import QueuePage
 from ui.history_page import HistoryPage
 from ui.settings_page import SettingsPage
 
 
 PAGES = [
     ("download", "download", "Downloads", "Download videos & audio"),
+    ("queue", "queue", "Queue", "Manage download queue"),
     ("history", "history", "History", "View download history"),
     ("settings", "settings", "Settings", "Configure preferences"),
 ]
@@ -86,10 +88,13 @@ class MainWindow(QMainWindow):
 
         self.stack = QStackedWidget()
         self.download_page = DownloadPage(self.engine, self.queue, self.history, self.theme_manager)
+        self.queue_page = QueuePage(self.engine, self.queue, self.theme_manager,
+                                     start_download_fn=self.download_page.start_next_download)
         self.history_page = HistoryPage(self.history)
         self.settings_page = SettingsPage(self.theme_manager)
 
         self.stack.addWidget(self.download_page)
+        self.stack.addWidget(self.queue_page)
         self.stack.addWidget(self.history_page)
         self.stack.addWidget(self.settings_page)
 

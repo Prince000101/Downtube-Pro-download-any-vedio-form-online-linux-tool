@@ -12,14 +12,16 @@ STATUS_CANCELLED = "cancelled"
 
 class DownloadItem:
     def __init__(self, url, title=None, thumbnail=None, duration=None,
-                 uploader=None, format_id=None, output_template=None,
-                 extra_args=None, playlist_title=None, playlist_index=None):
+                 uploader=None, format_id=None, format_note=None,
+                 output_template=None, extra_args=None,
+                 playlist_title=None, playlist_index=None):
         self.url = url
         self.title = title or url
         self.thumbnail = thumbnail
         self.duration = duration
         self.uploader = uploader
         self.format_id = format_id
+        self.format_note = format_note or ""
         self.output_template = output_template
         self.extra_args = extra_args or []
         self.playlist_title = playlist_title
@@ -29,6 +31,7 @@ class DownloadItem:
         self.progress = 0
         self.speed = ""
         self.eta = ""
+        self.total_size = ""
         self.error_msg = ""
         self.file_path = ""
         self.added_time = time.time()
@@ -42,8 +45,10 @@ class DownloadItem:
             "duration": self.duration,
             "uploader": self.uploader,
             "format_id": self.format_id,
+            "format_note": self.format_note,
             "status": self.status,
             "progress": self.progress,
+            "total_size": self.total_size,
             "file_path": self.file_path,
             "added_time": self.added_time,
             "completed_time": self.completed_time,

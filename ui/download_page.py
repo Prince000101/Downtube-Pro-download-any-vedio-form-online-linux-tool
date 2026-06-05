@@ -2,8 +2,7 @@ import os
 import time
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QCheckBox, QTextEdit, QListWidget,
-    QListWidgetItem, QFileDialog, QSplitter
+    QLineEdit, QCheckBox, QTextEdit, QFileDialog
 )
 from PyQt5.QtCore import Qt, QTimer, QSize
 
@@ -14,7 +13,7 @@ from core.queue import (
 from core.engine import DownloadEngine
 from core.history import HistoryManager
 from core import resource_path
-from ui.widgets import VideoCard, PreviewWidget, format_duration
+from ui.widgets import PreviewWidget, format_duration
 from ui.format_dialog import FormatDialog
 from ui.search_dialog import SearchDialog
 
@@ -29,6 +28,7 @@ class DownloadPage(QWidget):
         self.theme_manager = theme_manager
         self._current_info = None
         self._current_formats = []
+        self._selected_format = None
         self._current_index = -1
         self._last_url = ""
         self._fetch_timer = QTimer()
@@ -132,39 +132,14 @@ class DownloadPage(QWidget):
         action_layout.addWidget(self.cancel_btn)
         layout.addLayout(action_layout)
 
-        splitter = QSplitter(Qt.Vertical)
-
-        queue_widget = QWidget()
-        queue_layout = QVBoxLayout(queue_widget)
-        queue_layout.setContentsMargins(0, 0, 0, 0)
-        queue_layout.setSpacing(4)
-
-        queue_header = QLabel("Queue")
-        queue_header.setObjectName("subheading")
-        queue_layout.addWidget(queue_header)
-
-        self.queue_list = QListWidget()
-        self.queue_list.setMinimumHeight(120)
-        self.queue_list.setAlternatingRowColors(False)
-        queue_layout.addWidget(self.queue_list, 1)
-        splitter.addWidget(queue_widget)
-
-        log_widget = QWidget()
-        log_layout = QVBoxLayout(log_widget)
-        log_layout.setContentsMargins(0, 0, 0, 0)
-        log_layout.setSpacing(4)
-
         log_header = QLabel("Log")
         log_header.setObjectName("subheading")
-        log_layout.addWidget(log_header)
+        layout.addWidget(log_header)
 
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
-        self.log_output.setMinimumHeight(100)
-        log_layout.addWidget(self.log_output)
-        splitter.addWidget(log_widget)
-
-        layout.addWidget(splitter, 1)
+        self.log_output.setMinimumHeight(180)
+        layout.addWidget(self.log_output, 1)
 
         QTimer.singleShot(0, self._update_icons)
 
@@ -183,13 +158,9 @@ class DownloadPage(QWidget):
         self.engine.progress_changed.connect(self._on_progress)
         self.engine.speed_changed.connect(self._on_speed)
         self.engine.eta_changed.connect(self._on_eta)
+        self.engine.size_changed.connect(self._on_size)
         self.engine.log_line.connect(self.log_output.append)
         self.engine.finished.connect(self._on_download_finished)
-        self.engine.video_info_ready.connect(self._on_info_ready)
-        self.queue.item_added.connect(self._rebuild_queue)
-        self.queue.item_removed.connect(self._rebuild_queue)
-        self.queue.item_changed.connect(self._on_item_changed)
-        self.queue.current_changed.connect(self._on_current_changed)
         self.queue.all_completed.connect(self._on_all_completed)
 
     def _on_url_changed(self, url):
@@ -243,13 +214,13 @@ class DownloadPage(QWidget):
     def _select_format(self):
         if not self._current_formats:
             return
-        formats = self._current_formats
-        dialog = FormatDialog(formats, self)
+        dialog = FormatDialog(self._current_formats, self)
         if dialog.exec() == FormatDialog.Accepted and dialog.selected_format:
-            fmt = dialog.selected_format
+            self._selected_format = dialog.selected_format
+            fmt = self._selected_format
             self.log_output.append(
                 f"Selected format: {fmt.get('format_id')} - "
-                f"{fmt.get('resolution', '')} ({fmt.get('ext', '')})"
+                f"{fmt.get('format_note', '') or fmt.get('resolution', '')} ({fmt.get('ext', '')})"
             )
 
     def _start_download(self):
@@ -288,12 +259,15 @@ class DownloadPage(QWidget):
             extra_args += ["-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]", "--merge-output-format", "mp4"]
 
         info = self._current_info
+        fmt = self._selected_format
         item = DownloadItem(
             url=url,
             title=info.get("title", url) if info else url,
             thumbnail=info.get("thumbnail", "") if info else "",
             duration=info.get("duration") if info else None,
             uploader=info.get("uploader", info.get("channel", "")) if info else "",
+            format_id=fmt.get("format_id", "") if fmt else "",
+            format_note=fmt.get("format_note", "") if fmt else "",
             output_template=output_template,
             extra_args=extra_args,
         )
@@ -328,6 +302,10 @@ class DownloadPage(QWidget):
         if self._current_index >= 0:
             self.queue.update_item(self._current_index, eta=eta)
 
+    def _on_size(self, size):
+        if self._current_index >= 0:
+            self.queue.update_item(self._current_index, total_size=size)
+
     def _on_download_finished(self, success, msg):
         self.cancel_btn.setEnabled(False)
         self.download_btn.setEnabled(True)
@@ -353,41 +331,12 @@ class DownloadPage(QWidget):
     def _on_info_ready(self, info):
         pass
 
-    def _on_item_changed(self, index):
-        self._rebuild_queue()
-
-    def _on_current_changed(self, item):
-        pass
-
     def _on_all_completed(self):
         self.log_output.append("All downloads completed.")
         self.cancel_btn.setEnabled(False)
 
-    def _rebuild_queue(self):
-        self.queue_list.clear()
-        for i, item in enumerate(self.queue.items):
-            card = VideoCard(item, i, self.theme_manager)
-            if hasattr(card, "cancel_btn"):
-                card.cancel_btn.clicked.connect(lambda checked, idx=i: self._remove_item(idx))
-            if hasattr(card, "retry_btn"):
-                card.retry_btn.clicked.connect(lambda checked, idx=i: self._retry_item(idx))
-            widget_item = QListWidgetItem(self.queue_list)
-            widget_item.setSizeHint(card.sizeHint())
-            self.queue_list.addItem(widget_item)
-            self.queue_list.setItemWidget(widget_item, card)
-
-    def _remove_item(self, index):
-        item = self.queue.get(index)
-        if item and item.status == STATUS_DOWNLOADING:
-            self.engine.cancel()
-        self.queue.remove(index)
-
-    def _retry_item(self, index):
-        item = self.queue.get(index)
-        if item:
-            self.queue.update_item(index, status=STATUS_QUEUED, progress=0, error_msg="")
-            if not self.engine.is_running():
-                self._process_queue()
+    def start_next_download(self):
+        self._process_queue()
 
     def _clear(self):
         self.engine.cancel()
@@ -397,6 +346,7 @@ class DownloadPage(QWidget):
         self.preview.setVisible(False)
         self._current_info = None
         self._current_formats = []
+        self._selected_format = None
         self.format_btn.setEnabled(False)
         self.cancel_btn.setEnabled(False)
         self.download_btn.setEnabled(True)
