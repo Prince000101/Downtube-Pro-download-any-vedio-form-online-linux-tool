@@ -60,7 +60,7 @@ class ProgressDelegate(QStyledItemDelegate):
 
 
 class QueuePage(QWidget):
-    COLUMNS = ["", "Name", "Quality", "Size", "Progress", "Speed", "ETA"]
+    COLUMNS = ["", "Name", "Quality", "Type", "Size", "Progress", "Speed", "ETA"]
 
     def __init__(self, engine, queue, theme_manager, start_download_fn=None, parent=None):
         super().__init__(parent)
@@ -110,12 +110,13 @@ class QueuePage(QWidget):
 
         self.table.setColumnWidth(0, 32)
         self.table.setColumnWidth(2, 90)
-        self.table.setColumnWidth(3, 80)
-        self.table.setColumnWidth(4, 110)
-        self.table.setColumnWidth(5, 85)
-        self.table.setColumnWidth(6, 70)
+        self.table.setColumnWidth(3, 50)
+        self.table.setColumnWidth(4, 75)
+        self.table.setColumnWidth(5, 110)
+        self.table.setColumnWidth(6, 85)
+        self.table.setColumnWidth(7, 70)
 
-        self.table.setItemDelegateForColumn(4, ProgressDelegate(self.table))
+        self.table.setItemDelegateForColumn(5, ProgressDelegate(self.table))
 
         layout.addWidget(self.table, 1)
 
@@ -164,22 +165,26 @@ class QueuePage(QWidget):
         q.setTextAlignment(Qt.AlignCenter)
         self.table.setItem(row, 2, q)
 
+        dtype = QTableWidgetItem(item.download_type.upper())
+        dtype.setTextAlignment(Qt.AlignCenter)
+        self.table.setItem(row, 3, dtype)
+
         size_val = item.total_size or ("" if item.status != STATUS_ERROR else "-")
         s = QTableWidgetItem(size_val)
         s.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.table.setItem(row, 3, s)
+        self.table.setItem(row, 4, s)
 
         prog = QTableWidgetItem(f"{item.progress}%")
         prog.setTextAlignment(Qt.AlignCenter)
-        self.table.setItem(row, 4, prog)
+        self.table.setItem(row, 5, prog)
 
         speed = QTableWidgetItem(item.speed or "-")
         speed.setTextAlignment(Qt.AlignCenter)
-        self.table.setItem(row, 5, speed)
+        self.table.setItem(row, 6, speed)
 
         eta = QTableWidgetItem(item.eta or "-")
         eta.setTextAlignment(Qt.AlignCenter)
-        self.table.setItem(row, 6, eta)
+        self.table.setItem(row, 7, eta)
 
     def _update_row(self, row, idx):
         item = self.queue.get(idx)

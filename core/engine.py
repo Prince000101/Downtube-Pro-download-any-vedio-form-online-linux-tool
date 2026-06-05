@@ -119,6 +119,16 @@ class DownloadEngine(QObject):
                         pass
         return entries
 
+    def fetch_titles(self, urls):
+        p = QProcess(self)
+        args = [self.ytdlp_path, "--print", "title", "--ignore-errors", "--no-warnings"] + urls
+        p.start(args[0], args[1:])
+        p.waitForFinished(60000)
+        out = p.readAllStandardOutput().data().decode().strip()
+        if not out:
+            return []
+        return [line.strip() for line in out.split("\n") if line.strip()]
+
     def search(self, query, limit=10):
         search_url = f"ytsearch{limit}:{query}"
         p = QProcess(self)

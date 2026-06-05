@@ -13,9 +13,6 @@ from core.queue import (
 from core.engine import DownloadEngine
 from core.history import HistoryManager
 from core import resource_path
-from ui.widgets import PreviewWidget, format_duration
-from ui.format_dialog import FormatDialog
-from ui.search_dialog import SearchDialog
 
 
 class DownloadPage(QWidget):
@@ -26,14 +23,7 @@ class DownloadPage(QWidget):
         self.queue = queue
         self.history = history
         self.theme_manager = theme_manager
-        self._current_info = None
-        self._current_formats = []
-        self._selected_format = None
         self._current_index = -1
-        self._last_url = ""
-        self._fetch_timer = QTimer()
-        self._fetch_timer.setSingleShot(True)
-        self._fetch_timer.timeout.connect(self._do_fetch_info)
         self.setup_ui()
         self.connect_signals()
 
@@ -55,15 +45,14 @@ class DownloadPage(QWidget):
         self.url_input.setPlaceholderText("Paste YouTube URLs (one per line)...")
         self.url_input.setMinimumHeight(60)
         self.url_input.setMaximumHeight(100)
-        self.url_input.textChanged.connect(self._on_text_changed)
         input_layout.addWidget(self.url_input, 1)
 
-        self.search_btn = QPushButton()
-        self.search_btn.setObjectName("icon")
-        self.search_btn.setToolTip("Search YouTube")
-        self.search_btn.clicked.connect(self._open_search)
-        self.search_btn.setFixedSize(40, 40)
-        input_layout.addWidget(self.search_btn)
+        self.add_btn = QPushButton()
+        self.add_btn.setObjectName("icon")
+        self.add_btn.setToolTip("Add all URLs to queue")
+        self.add_btn.clicked.connect(self._add_to_queue)
+        self.add_btn.setFixedSize(40, 40)
+        input_layout.addWidget(self.add_btn)
 
         self.file_btn = QPushButton()
         self.file_btn.setObjectName("icon")
@@ -87,13 +76,6 @@ class DownloadPage(QWidget):
         options_layout.addWidget(self.subfolder_cb)
 
         options_layout.addStretch()
-
-        self.format_btn = QPushButton("Format")
-        self.format_btn.setObjectName("secondary")
-        self.format_btn.setEnabled(False)
-        self.format_btn.clicked.connect(self._select_format)
-        options_layout.addWidget(self.format_btn)
-
         layout.addLayout(options_layout)
 
         folder_layout = QHBoxLayout()
@@ -108,11 +90,6 @@ class DownloadPage(QWidget):
         self.folder_btn.setFixedSize(40, 40)
         folder_layout.addWidget(self.folder_btn)
         layout.addLayout(folder_layout)
-
-        self.preview = PreviewWidget()
-        self.preview.format_btn.clicked.connect(self._select_format)
-        self.preview.setVisible(False)
-        layout.addWidget(self.preview)
 
         action_layout = QHBoxLayout()
         self.download_btn = QPushButton("Download")
@@ -140,15 +117,15 @@ class DownloadPage(QWidget):
 
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
-        self.log_output.setMinimumHeight(180)
+        self.log_output.setMinimumHeight(220)
         layout.addWidget(self.log_output, 1)
 
         QTimer.singleShot(0, self._update_icons)
 
     def _update_icons(self):
         s = self.theme_manager
-        self.search_btn.setIcon(s.icon("search", 20))
-        self.search_btn.setIconSize(QSize(20, 20))
+        self.add_btn.setIcon(s.icon("arrow_down", 20))
+        self.add_btn.setIconSize(QSize(20, 20))
         self.file_btn.setIcon(s.icon("folder", 20))
         self.file_btn.setIconSize(QSize(20, 20))
         self.folder_btn.setIcon(s.icon("folder", 20))
@@ -165,47 +142,81 @@ class DownloadPage(QWidget):
         self.engine.finished.connect(self._on_download_finished)
         self.queue.all_completed.connect(self._on_all_completed)
 
-    def _on_text_changed(self):
-        url = self._first_url()
-        if url and url != self._last_url:
-            self._last_url = url
-            self._fetch_timer.start(800)
-
-    def _first_url(self):
-        for line in self.url_input.toPlainText().split("\n"):
-            line = line.strip()
-            if line.startswith("http"):
-                return line
-        return ""
-
     def _all_urls(self):
         return [line.strip() for line in self.url_input.toPlainText().split("\n")
                 if line.strip().startswith("http")]
 
-    def _do_fetch_info(self):
-        url = self._last_url
-        if not url or not url.startswith("http"):
+    def _build_args(self):
+        download_video = self.video_cb.isChecked()
+        download_audio = self.audio_cb.isChecked()
+        use_subfolder = self.subfolder_cb.isChecked()
+        if not download_video and not download_audio:
+            download_video = True
+
+        extra_args = []
+        template = "%(title)s.%(ext)s"
+        if use_subfolder:
+            template = "%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s"
+        output_template = os.path.join(self.folder_input.text().strip() or os.path.expanduser("~/Downloads"), template)
+
+        if download_video and not download_audio:
+            extra_args += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
+        elif download_audio and not download_video:
+            extra_args += [
+                "-x", "--audio-format", "mp3", "--audio-quality", "0",
+                "--embed-thumbnail", "--embed-metadata",
+                "--convert-thumbnails", "jpg"
+            ]
+        else:
+            extra_args += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
+
+        if download_audio and not download_video:
+            dtype = "mp3"
+        elif use_subfolder:
+            dtype = "playlist"
+        else:
+            dtype = "mp4"
+
+        return output_template, extra_args, dtype
+
+    def _queue_urls(self, urls, output_template, extra_args, dtype):
+        titles = self.engine.fetch_titles(urls)
+        count = 0
+        for i, url in enumerate(urls):
+            title = titles[i] if i < len(titles) and titles[i] else url
+            item = DownloadItem(
+                url=url, title=title,
+                output_template=output_template,
+                extra_args=list(extra_args),
+            )
+            item.download_type = dtype
+            self.queue.add(item)
+            count += 1
+        return count
+
+    def _add_to_queue(self):
+        urls = self._all_urls()
+        if not urls:
             return
-        self._current_info = None
-        self._current_formats = []
-        self.format_btn.setEnabled(False)
-        self.preview.setVisible(False)
+        output_template, extra_args, dtype = self._build_args()
+        count = self._queue_urls(urls, output_template, extra_args, dtype)
+        self.log_output.append(f"Queued {count} URL(s).")
 
-        info = self.engine.fetch_info(url)
-        if info:
-            self._current_info = info
-            formats = info.get("formats", [])
-            if formats:
-                self._current_formats = formats
-                self.format_btn.setEnabled(True)
-            self.preview.set_info(info)
-            self.preview.setVisible(True)
+    def _start_download(self):
+        urls = self._all_urls()
+        if not urls:
+            self.log_output.append("Please enter at least one URL.")
+            return
 
-    def _open_search(self):
-        dialog = SearchDialog(self.engine.search, self)
-        if dialog.exec() == SearchDialog.Accepted and dialog.selected_url:
-            self.url_input.setPlainText(dialog.selected_url)
-            self._last_url = ""
+        if not self.folder_input.text().strip():
+            self.folder_input.setText(os.path.expanduser("~/Downloads"))
+
+        output_template, extra_args, dtype = self._build_args()
+        count = self._queue_urls(urls, output_template, extra_args, dtype)
+        self.log_output.append(f"Queued {count} URL(s).")
+
+        if not self.engine.is_running():
+            self._process_queue()
 
     def _load_url_file(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open URL List", "", "Text Files (*.txt)")
@@ -215,79 +226,16 @@ class DownloadPage(QWidget):
             urls = [line.strip() for line in f if line.strip()]
         if not urls:
             return
-        items = [DownloadItem(url) for url in urls]
-        self.queue.add_multiple(items)
-        self.log_output.append(f"Loaded {len(urls)} URLs from file.")
+        output_template, extra_args, dtype = self._build_args()
+        count = self._queue_urls(urls, output_template, extra_args, dtype)
+        self.log_output.append(f"Queued {count} URLs from file.")
+        if not self.engine.is_running():
+            self._process_queue()
 
     def _select_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Download Folder")
         if folder:
             self.folder_input.setText(folder)
-
-    def _select_format(self):
-        if not self._current_formats:
-            return
-        dialog = FormatDialog(self._current_formats, self)
-        if dialog.exec() == FormatDialog.Accepted and dialog.selected_format:
-            self._selected_format = dialog.selected_format
-            fmt = self._selected_format
-            self.log_output.append(
-                f"Selected format: {fmt.get('format_id')} - "
-                f"{fmt.get('format_note', '') or fmt.get('resolution', '')} ({fmt.get('ext', '')})"
-            )
-
-    def _start_download(self):
-        urls = self._all_urls()
-        if not urls:
-            self.log_output.append("Please enter at least one URL.")
-            return
-
-        output_folder = self.folder_input.text().strip()
-        if not output_folder:
-            output_folder = os.path.expanduser("~/Downloads")
-            self.folder_input.setText(output_folder)
-
-        download_video = self.video_cb.isChecked()
-        download_audio = self.audio_cb.isChecked()
-        use_subfolder = self.subfolder_cb.isChecked()
-
-        if not download_video and not download_audio:
-            download_video = True
-
-        extra_args = []
-        template = "%(title)s.%(ext)s"
-        if use_subfolder:
-            template = "%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s"
-        output_template = os.path.join(output_folder, template)
-
-        if download_video and not download_audio:
-            extra_args += ["-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]", "--merge-output-format", "mp4"]
-        elif download_audio and not download_video:
-            extra_args += [
-                "-x", "--audio-format", "mp3", "--audio-quality", "0",
-                "--embed-thumbnail", "--embed-metadata",
-                "--convert-thumbnails", "jpg"
-            ]
-        else:
-            extra_args += ["-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]", "--merge-output-format", "mp4"]
-
-        fmt = self._selected_format
-        count = 0
-        for url in urls:
-            item = DownloadItem(
-                url=url,
-                title=url,
-                format_id=fmt.get("format_id", "") if fmt else "",
-                format_note=fmt.get("format_note", "") if fmt else "",
-                output_template=output_template,
-                extra_args=list(extra_args),
-            )
-            self.queue.add(item)
-            count += 1
-
-        self.log_output.append(f"Queued {count} URL(s).")
-        if not self.engine.is_running():
-            self._process_queue()
 
     def _process_queue(self):
         next_item = self.queue.next()
@@ -329,8 +277,7 @@ class DownloadPage(QWidget):
                     self.queue.update_item(self._current_index, status=STATUS_COMPLETED,
                                            progress=100, completed_time=time.time())
                     self.history.add_entry(
-                        url=item.url, title=item.title, thumbnail=item.thumbnail,
-                        duration=item.duration, uploader=item.uploader,
+                        url=item.url, title=item.title,
                         format_id=item.format_id, status="completed"
                     )
                 else:
@@ -340,9 +287,6 @@ class DownloadPage(QWidget):
                         format_id=item.format_id, status="error"
                     )
         QTimer.singleShot(500, self._process_queue)
-
-    def _on_info_ready(self, info):
-        pass
 
     def _on_all_completed(self):
         self.log_output.append("All downloads completed.")
@@ -356,10 +300,5 @@ class DownloadPage(QWidget):
         self.queue.clear()
         self.url_input.setPlainText("")
         self.log_output.clear()
-        self.preview.setVisible(False)
-        self._current_info = None
-        self._current_formats = []
-        self._selected_format = None
-        self.format_btn.setEnabled(False)
         self.cancel_btn.setEnabled(False)
         self.download_btn.setEnabled(True)

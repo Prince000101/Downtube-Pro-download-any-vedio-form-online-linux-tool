@@ -27,6 +27,7 @@ class DownloadItem:
         self.playlist_title = playlist_title
         self.playlist_index = playlist_index
 
+        self.download_type = ""
         self.status = STATUS_QUEUED
         self.progress = 0
         self.speed = ""
@@ -46,6 +47,7 @@ class DownloadItem:
             "uploader": self.uploader,
             "format_id": self.format_id,
             "format_note": self.format_note,
+            "download_type": self.download_type,
             "status": self.status,
             "progress": self.progress,
             "total_size": self.total_size,
